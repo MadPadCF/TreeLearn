@@ -41,6 +41,25 @@ def load_data(path):
             labels[non_tree_mask] = NON_TREE_CLASS_IN_RAW_DATA
             labels[unlabeled_mask] = INSTANCE_LABEL_IGNORE_IN_RAW_DATA
             data = np.hstack([points, labels[:,np.newaxis]])
+        elif hasattr(las_file, 'Tree_ID') and hasattr(las_file, 'classification'): # Climate Friendly curated files use these fields
+            treeID = np.array(las_file.Tree_ID)
+            classes = np.array(las_file.classification)
+
+            # Climate Friendly class number for trees must be remapped from 1 to 4
+            classes[classes == 1] = 4
+
+            tree_mask = treeID != 0
+            non_tree_mask = np.isin(classes, [1, 2]) # terrain or vegetation according to For-Instance labeling convention (https://zenodo.org/records/8287792)
+            unlabeled_mask = np.logical_not(tree_mask) & np.logical_not(non_tree_mask)
+            assert (tree_mask & non_tree_mask & unlabeled_mask).sum() == 0
+
+            points = np.vstack((las_file.x, las_file.y, las_file.z)).T
+            points = points - las_file.header.offset
+            labels = np.ones(len(points))
+            labels[tree_mask] = treeID[tree_mask]
+            labels[non_tree_mask] = NON_TREE_CLASS_IN_RAW_DATA
+            labels[unlabeled_mask] = INSTANCE_LABEL_IGNORE_IN_RAW_DATA
+            data = np.hstack([points, labels[:,np.newaxis]])
         else:
             data = np.vstack((las_file.x, las_file.y, las_file.z)).T
             data = data - las_file.header.offset
@@ -144,7 +163,9 @@ class SampleGenerator:
         occupancy_grid = np.ones((x_dim, y_dim, 3)) * 10
 
         mask_valid_points = self.label != ignore_for_occupancy
+        print(f"Points before masking: {len(self.points)}")
         points = self.points[mask_valid_points]
+        print(f"Len points: {len(points)}")
         idx = np.random.randint(0, len(points), size=n)
         points = points[idx]
 

@@ -29,12 +29,12 @@ scheduler: # learning rate scheduler arguments (see https://timm.fast.ai/schedul
   cycle_limit: 1
   t_in_epochs: True
 
-epochs: 1400 # number of epochs to train
-examples_per_epoch: 500 # number of crops to use per epoch
+epochs: 400 #1400 # number of epochs to train
+examples_per_epoch: 500 #500 # number of crops to use per epoch
 fp16: True # using half precision for network prediction
-pretrain: 'data/model_weights/hais_ckpt_spconv2.pth' # path to pretrained network parameters, set to ~ if not using pretrain
+pretrain: 'data/model_weights/root/TreeLearn/data/model_weights/hais_ckpt_spconv2.pth' #'data/model_weights/hais_ckpt_spconv2.pth' # path to pretrained network parameters, set to ~ if not using pretrain
 grad_norm_clip: True # gradient clipping to avoid excessive gradient magnitude
 
 # validation args
 save_frequency: 20 # save frequency of state dict
-validation_frequency: 20 # validation frequency
+validation_frequency: 200 #20 # validation frequency

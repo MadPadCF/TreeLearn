@@ -73,6 +73,7 @@ def get_pointwise_preds(model, dataloader, config, logger=None):
     with torch.no_grad():
         model.eval()
         semantic_prediction_logits, offset_predictions, semantic_labels, offset_labels, coords, instance_labels, backbone_feats, input_feats = [], [], [], [], [], [], [], []
+        empty_batches = 0
         for batch in tqdm.tqdm(dataloader):
             # get voxel_sizes to use in forward
             batch['voxel_size'] = config.voxel_size
@@ -86,6 +87,9 @@ def get_pointwise_preds(model, dataloader, config, logger=None):
                     if logger:
                         logger.info('Error in forward pass due to axis size collapse to zero during contraction of U-Net. If this does not happen too often, the results should not be influenced.')
                     continue 
+                elif "Expected reduction dim 0 to have non-zero size" in str(e):
+                    empty_batches+=1
+                    continue
                 else:
                     raise
 
@@ -94,6 +98,8 @@ def get_pointwise_preds(model, dataloader, config, logger=None):
             semantic_prediction_logits.append(semantic_prediction_logit[batch['masks_inner']]), semantic_labels.append(batch['semantic_labels'][batch['masks_inner']])
             offset_predictions.append(offset_prediction[batch['masks_inner']]), offset_labels.append(batch['offset_labels'][batch['masks_inner']])
             coords.append(batch['coords'][batch['masks_inner']]), instance_labels.append(batch['instance_labels'][batch['masks_inner']]), backbone_feats.append(backbone_feat[batch['masks_inner']])
+        if logger:
+            logger.info(f"CF Warning: {empty_batches} batches had 0 points.")
 
     input_feats = torch.cat(input_feats, 0).numpy()
     semantic_prediction_logits, semantic_labels = torch.cat(semantic_prediction_logits, 0).numpy(), torch.cat(semantic_labels, 0).numpy()
@@ -104,6 +110,7 @@ def get_pointwise_preds(model, dataloader, config, logger=None):
 
 
 def ensemble(coords, semantic_scores, semantic_labels, offset_predictions, offset_labels, instance_labels, feats, input_feats):
+    print("Ensembling predictions")
     feats_col_names = [f'feats{i}' for i in range(feats.shape[1])]
     feats = pd.DataFrame(feats, columns=feats_col_names)
     
@@ -119,18 +126,54 @@ def ensemble(coords, semantic_scores, semantic_labels, offset_predictions, offse
 
     df = pd.concat([coords, semantic_scores, semantic_labels, offset_predictions, offset_labels, instance_labels, feats, input_feats], axis=1)
 
-    df = df.round({'x': 2, 'y': 2, 'z': 2})
+    print("Rounding dataframe")
+
+    df[['x', 'y', 'z']] = df[['x', 'y', 'z']].round(2)
+    print("Grouping 1")
     grouped = df.groupby(['x', 'y', 'z']).mean().reset_index()
 
+    # ### Chunked grouping >>>
+    # chunk_size = 1000
+    # # Define the columns to group by
+    # groupby_cols = ['x', 'y', 'z']
+
+    # # Initialize an empty list to store the results
+    # result_chunks = []
+
+    # # Iterate over the DataFrame in chunks
+    # for chunk_start in range(0, len(df), chunk_size):
+    #     chunk_end = min(chunk_start + chunk_size, len(df))
+    #     chunk_df = df.iloc[chunk_start:chunk_end]
+
+    #     # Perform the groupby operation on the chunk
+    #     grouped_chunk = chunk_df.groupby(groupby_cols).mean().reset_index()
+
+    #     # Append the grouped chunk to the results list
+    #     result_chunks.append(grouped_chunk)
+
+    # # Concatenate the results to obtain the final grouped DataFrame
+    # grouped = pd.concat(result_chunks, ignore_index=True)
+    # ### <<< Chunked grouping
+
     # Convert columns to desired data types
-    coords = grouped[['x', 'y', 'z']].to_numpy().astype('float32')
-    semantic_scores = grouped[['sem_scores1', 'sem_scores2']].to_numpy().astype('float32')
-    semantic_labels = grouped[['semantic_labels']].to_numpy().astype('int64').flatten()
-    offset_predictions = grouped[['offset_pred1', 'offset_pred2', 'offset_pred3']].to_numpy().astype('float32')
-    offset_labels = grouped[['offset_lab1', 'offset_lab2', 'offset_lab3']].to_numpy().astype('float32')
-    instance_labels = grouped[['instance_labels']].to_numpy().astype('int64').flatten()
-    feats = grouped[feats_col_names].to_numpy().astype('float32')
-    input_feats = grouped[input_feats_col_names].to_numpy().astype('float32')
+    # coords = grouped[['x', 'y', 'z']].to_numpy().astype('float32')
+    # semantic_scores = grouped[['sem_scores1', 'sem_scores2']].to_numpy().astype('float32')
+    # semantic_labels = grouped[['semantic_labels']].to_numpy().astype('int64').flatten()
+    # offset_predictions = grouped[['offset_pred1', 'offset_pred2', 'offset_pred3']].to_numpy().astype('float32')
+    # offset_labels = grouped[['offset_lab1', 'offset_lab2', 'offset_lab3']].to_numpy().astype('float32')
+    # instance_labels = grouped[['instance_labels']].to_numpy().astype('int64').flatten()
+    # feats = grouped[feats_col_names].to_numpy().astype('float32')
+    # input_feats = grouped[input_feats_col_names].to_numpy().astype('float32')
+    print("Grouping 2")
+    coords = grouped[['x', 'y', 'z']].values.astype('float32')
+    semantic_scores = grouped[['sem_scores1', 'sem_scores2']].values.astype('float32')
+    semantic_labels = grouped['semantic_labels'].values.astype('int64')
+    offset_predictions = grouped[['offset_pred1', 'offset_pred2', 'offset_pred3']].values.astype('float32')
+    offset_labels = grouped[['offset_lab1', 'offset_lab2', 'offset_lab3']].values.astype('float32')
+    instance_labels = grouped['instance_labels'].values.astype('int64')
+    feats = grouped[feats_col_names].values.astype('float32')
+    input_feats = grouped[input_feats_col_names].values.astype('float32')
+    print ("Returning")
 
     return coords, semantic_scores, semantic_labels, offset_predictions, offset_labels, instance_labels, feats, input_feats
 
