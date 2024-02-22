@@ -16,10 +16,10 @@ model:
   spatial_shape: [500, 500, 1000]
 
 ############ non-default args
-forest_path: '/root/TreeLearn/data/pipeline/RTC_dense_rehais/forest/RTC_densepatch_6mm 1.laz' # path to forest point cloud to be segmented (las, npy, npz or txt)
+forest_path: '/root/TreeLearn/data/pipeline/plot8/forest/plot8_laz1_4_denoised_segmented_withlabels_cropped_e1_t500.las' # path to forest point cloud to be segmented (las, npy, npz or txt)
 pretrain: 'data/model_weights/hais_ckpt_spconv2.pth' # path to traine d network parameters for offset and semantic prediction
 fp16: True # using half precision for network prediction
-tile_generation: True # whether to generate tiles for the forest point cloud to be segmented. If you re-run the pipeline multiple times for the same point cloud, this can be set to False after the first time.
+tile_generation: False # whether to generate tiles for the forest point cloud to be segmented. If you re-run the pipeline multiple times for the same point cloud, this can be set to False after the first time.
 
 dataloader:
   batch_size: 1
@@ -27,7 +27,7 @@ dataloader:
 
 shape_cfg:
   alpha: 0 # alpha value in hull calculation to get xy outline of forest point cloud. 0 leads to convex hull. alpha=0.6 nice for point clouds that are non-convex in the xy plane.
-  outer_remove: 13.5 # When returning the segmentation result, crop outer_remove meters at the edges of the input point cloud. This is recommended since edge predictions are worse because they lack context for prediction.
+  outer_remove: 1 # 13.5 # When returning the segmentation result, crop outer_remove meters at the edges of the input point cloud. This is recommended since edge predictions are worse because they lack context for prediction.
   buffer_size_to_determine_edge_trees: 0.3 # determine which trees are completely within the segment. This is used to return different categories of trees (e.g. completely vs. partly within cropped result).
 
 save_cfg:
