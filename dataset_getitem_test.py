@@ -69,12 +69,14 @@ las.z = points[:, 2]
 
 las.add_extra_dim(laspy.ExtraBytesParams(name="offset_dist", type=np.float64))
 las.offset_dist = sum_sq
+las.add_extra_dim(laspy.ExtraBytesParams(name="instance_label", type=np.float64))
+las.instance_label = instance_label.numpy()
 
 
 
 # Write the pointcloud with offset LAS file to disk
 save_path = osp.join('/root/', 'true_offset.laz')
-# las.write(save_path)
+las.write(save_path)
 
 # Peak LAS file
 header = laspy.LasHeader(version="1.2", point_format=3)
@@ -87,9 +89,10 @@ las.z = peaks[:, 2]
 save_path = osp.join('/root/', 'peaks.laz')
 # las.write(save_path)
 
-
 # Test instance label
-# print(f'Instance label: {torch.unique(instance_label)}')
+print(f'Instance label: {torch.unique(instance_label).shape[0]}')
+
+# Test offset labels
 print(f'Number of peaks: {(torch.unique(torch.round((xyz + pt_offset_label)*10)/10, dim=0)).shape[0]}')
 
 # Test semantic label
